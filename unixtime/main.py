@@ -1,18 +1,20 @@
 from argparse import ArgumentParser
 from datetime import datetime
+import dateutil.parser
 import time
 
 
 def get_args():
     parser = ArgumentParser()
+    parser.add_argument('--parse', action='store_true')
     parser.add_argument('--milliseconds', '-m', action='store_true')
-    parser.add_argument('timestamp', type=float, nargs='?', default=time.time())
+    parser.add_argument('timestamp', type=str, nargs='?', default=None)
     parsed = parser.parse_args()
     return parsed
 
 
-def unixtime_command(args):
-    timestamp = int(args.timestamp) if not args.milliseconds else float(args.timestamp) // 1000
+def parse_command(args):
+    timestamp = int(dateutil.parser.parse(args.timestamp).timestamp() if args.timestamp else time.time())
     return {
         'timestamp': timestamp,
         'local': datetime.fromtimestamp(timestamp - time.timezone),
@@ -20,10 +22,26 @@ def unixtime_command(args):
     }
 
 
+def unixtime_command(args):
+    unixtime = float(args.timestamp or time.time())
+    timestamp = int(unixtime) if not args.milliseconds else unixtime // 1000
+    return {
+        'timestamp': timestamp,
+        'local': datetime.fromtimestamp(timestamp - time.timezone),
+        'utc': datetime.fromtimestamp(timestamp),
+    }
+
+
+COMMAND_FROM_PARSE_FLAG = {
+    True: parse_command,
+    False: unixtime_command,
+}
+
+
 def main():
     try:
         args = get_args()
-        command = unixtime_command
+        command = COMMAND_FROM_PARSE_FLAG[args.parse]
         results = command(args)
         print('Timestamp: {timestamp}'.format(**results))
         print('    Local: {local}'.format(**results))
